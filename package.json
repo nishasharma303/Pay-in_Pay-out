@@ -1,0 +1,18 @@
+{
+  "name": "payin-payout",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"cd server && npm run dev\" \"cd client && npm run dev\"",
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "setup": "npm install && cd server && npm install && cd ../client && npm install",
+    "db:push": "cd server && npx prisma db push",
+    "db:generate": "cd server && npx prisma generate",
+    "db:seed": "cd server && npm run db:seed",
+    "db:studio": "cd server && npx prisma studio"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

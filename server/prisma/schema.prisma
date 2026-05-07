@@ -1,0 +1,261 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  CLIENT
+  AGENT
+}
+
+enum KycStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TransactionType {
+  PAY_IN
+  PAY_OUT
+  WALLET_TRANSFER
+  COMMISSION
+  REFUND
+  CHARGE
+}
+
+enum TransactionStatus {
+  INITIATED
+  PENDING
+  SUCCESS
+  FAILED
+  REVERSED
+}
+
+enum LedgerEntryType {
+  CREDIT
+  DEBIT
+}
+
+enum PayoutMode {
+  IMPS
+  NEFT
+  UPI
+}
+
+// ─── User & Auth ──────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  phone        String?  @unique
+  name         String
+  passwordHash String
+  role         Role     @default(AGENT)
+  isActive     Boolean  @default(true)
+  isVerified   Boolean  @default(false)
+
+  // Hierarchy: a user can have a parent (e.g., agent → client → admin)
+  parentId     String?
+  parent       User?    @relation("UserHierarchy", fields: [parentId], references: [id])
+  children     User[]   @relation("UserHierarchy")
+
+  // Relations
+  wallet       Wallet?
+  kyc          KycDetail?
+  refreshTokens RefreshToken[]
+  transactions  Transaction[] @relation("UserTransactions")
+  commissionsEarned Commission[] @relation("CommissionRecipient")
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([role])
+  @@index([parentId])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ─── KYC ──────────────────────────────────────────────────────────────────────
+
+model KycDetail {
+  id             String    @id @default(cuid())
+  userId         String    @unique
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  panNumber      String?
+  aadhaarNumber  String?   // Store masked: XXXX-XXXX-1234
+  bankName       String?
+  accountNumber  String?   // Store encrypted in production
+  ifscCode       String?
+  accountHolder  String?
+
+  // Document image paths (store S3/Cloudinary URLs)
+  panImageUrl    String?
+  aadhaarFrontUrl String?
+  aadhaarBackUrl String?
+  selfieUrl      String?
+
+  status         KycStatus @default(PENDING)
+  reviewNote     String?   // Admin note on rejection
+  reviewedAt     DateTime?
+  reviewedById   String?
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+// ─── Wallet & Ledger ──────────────────────────────────────────────────────────
+
+model Wallet {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Balances in paise (smallest unit) to avoid floating point issues
+  // Always divide by 100 when displaying
+  primaryBalance   BigInt   @default(0)   // Main spendable balance
+  secondaryBalance BigInt   @default(0)   // Loaded but not yet transferred
+  holdBalance      BigInt   @default(0)   // Frozen for pending transactions
+
+  ledgerEntries    LedgerEntry[]
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model LedgerEntry {
+  id              String          @id @default(cuid())
+  walletId        String
+  wallet          Wallet          @relation(fields: [walletId], references: [id])
+
+  type            LedgerEntryType
+  amount          BigInt          // In paise
+  balanceAfter    BigInt          // Running balance after this entry (in paise)
+
+  description     String
+  referenceId     String?         // Transaction ID or external ref
+  transactionId   String?
+  transaction     Transaction?    @relation(fields: [transactionId], references: [id])
+
+  metadata        Json?           // Extra data (biller name, etc.)
+  createdAt       DateTime        @default(now())
+
+  @@index([walletId])
+  @@index([referenceId])
+  @@index([createdAt])
+}
+
+// ─── Transactions ─────────────────────────────────────────────────────────────
+
+model Transaction {
+  id              String            @id @default(cuid())
+  userId          String
+  user            User              @relation("UserTransactions", fields: [userId], references: [id])
+
+  type            TransactionType
+  status          TransactionStatus @default(INITIATED)
+
+  amount          BigInt            // In paise
+  fee             BigInt            @default(0)
+  netAmount       BigInt            // amount - fee
+
+  // External references
+  gatewayOrderId  String?           // Razorpay order ID / Cashfree order ID
+  gatewayPaymentId String?          // Razorpay payment ID
+  gatewayRef      String?           // Any gateway reference
+
+  // Payout specific
+  payoutMode      PayoutMode?
+  beneficiaryName String?
+  accountNumber   String?
+  ifscCode        String?
+  upiId           String?
+
+  // Webhook idempotency
+  webhookEventId  String?           @unique
+
+  description     String?
+  failureReason   String?
+  metadata        Json?
+
+  ledgerEntries   LedgerEntry[]
+  commissions     Commission[]
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([type])
+  @@index([gatewayOrderId])
+  @@index([createdAt])
+}
+
+// ─── Commissions ──────────────────────────────────────────────────────────────
+
+model CommissionRule {
+  id            String   @id @default(cuid())
+  role          Role     // Who earns this commission
+  serviceType   String   // e.g. "AEPS", "BBPS", "DMT"
+  isPercentage  Boolean  @default(true)
+  value         Float    // e.g. 0.5 for 0.5% or 5 for flat ₹5
+  isActive      Boolean  @default(true)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([role, serviceType])
+}
+
+model Commission {
+  id            String      @id @default(cuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  recipientId   String
+  recipient     User        @relation("CommissionRecipient", fields: [recipientId], references: [id])
+
+  role          Role
+  amount        BigInt      // In paise
+  isSettled     Boolean     @default(false)
+  settledAt     DateTime?
+
+  createdAt     DateTime    @default(now())
+
+  @@index([transactionId])
+  @@index([recipientId])
+}
+
+// ─── Audit Logs ───────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String   // e.g. "USER_LOGIN", "KYC_APPROVED", "WALLET_CREDITED"
+  entity     String?  // e.g. "User", "Transaction"
+  entityId   String?
+  ipAddress  String?
+  userAgent  String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
