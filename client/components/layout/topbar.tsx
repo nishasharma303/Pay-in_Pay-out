@@ -1,5 +1,5 @@
 'use client';
-import { Bell, RefreshCw } from 'lucide-react';
+import { Bell, RefreshCw, Menu } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { useWallet } from '@/hooks/use-auth';
 import { useMyKyc } from '@/hooks/use-kyc';
@@ -24,7 +24,11 @@ const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
   '/dashboard/settings':    { title: 'Settings',        subtitle: 'Account preferences' },
 };
 
-export function Topbar() {
+interface TopbarProps {
+  onMenuClick?: () => void;
+}
+
+export function Topbar({ onMenuClick }: TopbarProps) {
   const pathname = usePathname();
   const { user } = useAuthStore();
   const { data: wallet, refetch } = useWallet();
@@ -34,10 +38,19 @@ export function Topbar() {
   const kycNotVerified = !user?.isVerified;
 
   return (
-    <header className="flex items-center justify-between px-6 py-3.5 border-b border-gray-200 bg-white flex-shrink-0 shadow-sm">
-      <div>
-        <h1 className="text-base font-semibold text-gray-900 tracking-tight">{page.title}</h1>
-        <p className="text-xs text-gray-400">{page.subtitle}</p>
+    <header className="flex items-center justify-between px-4 lg:px-6 py-3.5 border-b border-gray-200 bg-white flex-shrink-0 shadow-sm">
+      <div className="flex items-center gap-3">
+        {/* Mobile menu button */}
+        <button
+          onClick={onMenuClick}
+          className="lg:hidden w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-all"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+        <div>
+          <h1 className="text-sm lg:text-base font-semibold text-gray-900 tracking-tight">{page.title}</h1>
+          <p className="text-xs text-gray-400 hidden sm:block">{page.subtitle}</p>
+        </div>
       </div>
       <div className="flex items-center gap-2">
         {kycNotVerified && pathname !== '/dashboard/kyc' && (
@@ -48,7 +61,7 @@ export function Topbar() {
           </Link>
         )}
         {wallet && (
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-xs">
+          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-xs">
             <span className="text-gray-500">Balance</span>
             <span className="font-semibold text-emerald-600">{formatCurrency(wallet.primaryBalance)}</span>
           </div>

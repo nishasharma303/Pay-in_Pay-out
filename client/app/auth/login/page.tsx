@@ -51,17 +51,17 @@ export default function LoginPage() {
       </div>
 
       {/* Right panel */}
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="w-full max-w-sm animate-fade-in">
-          <div className="flex lg:hidden items-center gap-2 mb-8">
+      <div className="flex-1 flex items-center justify-center p-4 sm:p-8">
+        <div className="w-full max-w-sm">
+          <div className="flex lg:hidden items-center gap-2 mb-6 sm:mb-8">
             <div className="w-8 h-8 bg-brand-gradient rounded-lg flex items-center justify-center">
               <Zap className="w-4 h-4 text-white" />
             </div>
             <span className="font-semibold text-gray-900">PayFlow</span>
           </div>
 
-          <h2 className="text-2xl font-bold tracking-tight text-gray-900 mb-1">Welcome back</h2>
-          <p className="text-sm text-gray-500 mb-8">Sign in to your account to continue</p>
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900 mb-1">Welcome back</h2>
+          <p className="text-sm text-gray-500 mb-6 sm:mb-8">Sign in to your account to continue</p>
 
           {isRegistered && (
             <div className="mb-5 px-4 py-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm">

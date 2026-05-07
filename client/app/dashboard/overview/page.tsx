@@ -28,9 +28,9 @@ export default function OverviewPage() {
   return (
     <div className="space-y-5">
       {/* Welcome */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">
+          <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">
             Good {getGreeting()},{' '}
             <span className="bg-gradient-to-r from-brand-400 to-purple-400 bg-clip-text text-transparent">
               {me?.name?.split(' ')[0] ?? '...'}
@@ -40,7 +40,7 @@ export default function OverviewPage() {
             {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
         </div>
-        <Link href="/dashboard/pay-in" className="btn-primary hidden sm:inline-flex">
+        <Link href="/dashboard/pay-in" className="btn-primary w-full sm:w-auto justify-center sm:inline-flex">
           <Zap className="w-4 h-4" /> New Transaction
         </Link>
       </div>
@@ -83,7 +83,7 @@ export default function OverviewPage() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <StatCard label="Primary Balance" value={wallet ? formatCurrency(wallet.primaryBalance) : '—'}
           delta="Available to spend" deltaType="neutral"
           icon={<Wallet className="w-4 h-4 text-success" />} iconBg="bg-success/10" loading={walletLoading} />
@@ -97,7 +97,7 @@ export default function OverviewPage() {
       </div>
 
       {/* Main grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 lg:gap-5">
         {/* Ledger */}
         <div className="lg:col-span-2">
           <Card>

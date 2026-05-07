@@ -20,7 +20,7 @@ interface CashfreeResponse {
   [key: string]: any;
 }
 
-// ─── Cashfree API helper ──────────────────────────────────────────────────────
+// ─── Cashfree API helper - FIXED ──────────────────────────────────────────────
 const cfRequest = async (method: string, path: string, body?: object): Promise<CashfreeResponse> => {
   if (!process.env.CASHFREE_APP_ID || !process.env.CASHFREE_SECRET_KEY) {
     throw new AppError('Cashfree not configured. Set CASHFREE_APP_ID and CASHFREE_SECRET_KEY in .env', 503, 'CASHFREE_NOT_CONFIGURED');
@@ -37,11 +37,13 @@ const cfRequest = async (method: string, path: string, body?: object): Promise<C
     body: body ? JSON.stringify(body) : undefined,
   });
 
-  const data = await res.json();
+  const data = await res.json() as CashfreeResponse;
+  
   if (!res.ok) {
-    const data = await res.json() as CashfreeResponse;
+    throw new AppError(data.message || 'Cashfree API error', res.status, 'CASHFREE_ERROR');
   }
-  return data as CashfreeResponse;
+  
+  return data;
 };
 
 // ─── Validate IFSC code format ────────────────────────────────────────────────
@@ -55,20 +57,16 @@ export const initiatePayout = async (
     amount: number;
     mode: PayoutMode;
     beneficiaryName: string;
-    // Bank transfer fields
     accountNumber?: string;
     ifscCode?: string;
     bankName?: string;
-    // UPI fields
     upiId?: string;
-    // Optional
     remarks?: string;
   }
 ) => {
   const { amount, mode, beneficiaryName, accountNumber, ifscCode, bankName, upiId, remarks } = payload;
   const amountPaise = BigInt(Math.round(amount * 100));
 
-  // ── Validate inputs ──
   if (amount < 1) throw new AppError('Minimum payout amount is ₹1', 400, 'MIN_AMOUNT');
   if (amount > 200000) throw new AppError('Maximum payout amount is ₹2,00,000 per transaction', 400, 'MAX_AMOUNT');
 
@@ -81,10 +79,8 @@ export const initiatePayout = async (
     if (!isValidIfsc(ifscCode)) throw new AppError('Invalid IFSC code format (e.g. SBIN0001234)', 400, 'INVALID_IFSC');
   }
 
-  // ── Step 1: Hold balance to prevent concurrent double-spend ──
   await holdBalance(userId, amountPaise, `Payout to ${beneficiaryName}`);
 
-  // ── Step 2: Create transaction record ──
   const transaction = await prisma.transaction.create({
     data: {
       userId,
@@ -103,7 +99,6 @@ export const initiatePayout = async (
   });
 
   try {
-    // ── Step 3: Call Cashfree API ──
     const cfPayload = mode === PayoutMode.UPI
       ? {
           transfer_id: transaction.id,
@@ -133,7 +128,6 @@ export const initiatePayout = async (
 
     const cfResponse = await cfRequest('POST', '/payout/v1/transfers', cfPayload);
 
-    // ── Step 4: Update transaction with gateway reference ──
     await prisma.transaction.update({
       where: { id: transaction.id },
       data: {
@@ -160,7 +154,6 @@ export const initiatePayout = async (
       message: `Payout of ₹${amount} initiated via ${mode}. Estimated: ${mode === PayoutMode.IMPS ? '30 seconds' : '2-4 hours'}`,
     };
   } catch (err) {
-    // ── Rollback: release hold back to primary on API failure ──
     await releaseHold(userId, amountPaise, true, 'Payout API failed');
     await prisma.transaction.update({
       where: { id: transaction.id },
@@ -173,12 +166,11 @@ export const initiatePayout = async (
   }
 };
 
-// ─── Check payout status (poll or webhook update) ─────────────────────────────
+// ─── Check payout status ──────────────────────────────────────────────────────
 export const checkPayoutStatus = async (transactionId: string) => {
   const transaction = await prisma.transaction.findUnique({ where: { id: transactionId } });
   if (!transaction) throw new AppError('Transaction not found', 404, 'NOT_FOUND');
 
-  // Already terminal — no need to call API
   const terminalStatuses: TransactionStatus[] = [TransactionStatus.SUCCESS, TransactionStatus.FAILED, TransactionStatus.REVERSED];
   if (terminalStatuses.includes(transaction.status)) {
     return transaction;
@@ -190,13 +182,13 @@ export const checkPayoutStatus = async (transactionId: string) => {
     const cfResponse = await cfRequest('GET', `/payout/v1/transfers/${transaction.gatewayRef}`);
     await updatePayoutStatus(transactionId, cfResponse.transfer_status || '', cfResponse);
   } catch {
-    // Don't fail the request if status check fails — return current status
+    // Don't fail if status check fails
   }
 
   return prisma.transaction.findUnique({ where: { id: transactionId } });
 };
 
-// ─── Update payout status (called by webhook + polling) ──────────────────────
+// ─── Update payout status ─────────────────────────────────────────────────────
 export const updatePayoutStatus = async (
   transactionId: string,
   cfStatus: string,
@@ -219,11 +211,9 @@ export const updatePayoutStatus = async (
   const newStatus = statusMap[cfStatus.toUpperCase()] || TransactionStatus.PENDING;
 
   if (newStatus === TransactionStatus.SUCCESS) {
-    // Release hold (success = money is gone, don't credit back)
     await releaseHold(transaction.userId, transaction.amount, false, 'Payout successful');
     await prisma.transaction.update({ where: { id: transactionId }, data: { status: newStatus, metadata: metadata as any } });
   } else if (newStatus === TransactionStatus.FAILED || newStatus === TransactionStatus.REVERSED) {
-    // Return held money back to primary
     await releaseHold(transaction.userId, transaction.amount, true, `Payout ${newStatus.toLowerCase()}`);
     await prisma.transaction.update({
       where: { id: transactionId },
@@ -255,7 +245,6 @@ export const retryPayout = async (transactionId: string, userId: string) => {
 
 // ─── Webhook handler ─────────────────────────────────────────────────────────
 export const handleWebhook = async (rawBody: string, signature: string, timestamp: string) => {
-  // Verify Cashfree webhook signature
   const secret = process.env.CASHFREE_SECRET_KEY!;
   const signedPayload = `${timestamp}${rawBody}`;
   const expectedSig = crypto.createHmac('sha256', secret).update(signedPayload).digest('base64');

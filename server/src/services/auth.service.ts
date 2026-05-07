@@ -22,13 +22,30 @@ export const registerUser = async (data: {
   }
 
   const passwordHash = await bcrypt.hash(data.password, 10);
+  
+  // Default role: CLIENT (not AGENT) for public registration
+  // AGENT can only be created by admins
+  let userRole = data.role || Role.CLIENT;
+  
+  // If someone tries to register as AGENT without admin privileges, default to CLIENT
+  if (userRole === Role.AGENT && !data.parentId) {
+    userRole = Role.CLIENT;
+  }
+  
   const user = await prisma.user.create({
     data: {
-      name: data.name, email: data.email, phone: data.phone,
-      passwordHash, role: data.role || Role.AGENT, parentId: data.parentId,
-      wallet: { create: { primaryBalance: 0n, secondaryBalance: 0n } },
+      name: data.name, 
+      email: data.email, 
+      phone: data.phone,
+      passwordHash, 
+      role: userRole, 
+      parentId: data.parentId,
+      wallet: { create: { primaryBalance: 0n, secondaryBalance: 0n, holdBalance: 0n } },
     },
-    select: { id: true, name: true, email: true, phone: true, role: true, isActive: true, isVerified: true, createdAt: true },
+    select: { 
+      id: true, name: true, email: true, phone: true, role: true, 
+      isActive: true, isVerified: true, createdAt: true, parentId: true 
+    },
   });
 
   await prisma.auditLog.create({
@@ -40,7 +57,10 @@ export const registerUser = async (data: {
 export const loginUser = async (email: string, password: string) => {
   const user = await prisma.user.findUnique({
     where: { email },
-    include: { wallet: { select: { primaryBalance: true, secondaryBalance: true } } },
+    include: { 
+      wallet: { select: { primaryBalance: true, secondaryBalance: true, holdBalance: true } },
+      kyc: { select: { status: true } }
+    },
   });
 
   if (!user)           throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS');
@@ -66,11 +86,21 @@ export const loginUser = async (email: string, password: string) => {
   const { passwordHash: _, ...safeUser } = user;
   return {
     user: {
-      ...safeUser,
-      wallet: user.wallet ? {
-        primaryBalance:   Number(user.wallet.primaryBalance)   / 100,
-        secondaryBalance: Number(user.wallet.secondaryBalance) / 100,
+      id: safeUser.id,
+      name: safeUser.name,
+      email: safeUser.email,
+      phone: safeUser.phone,
+      role: safeUser.role,
+      isActive: safeUser.isActive,
+      isVerified: safeUser.isVerified,
+      createdAt: safeUser.createdAt,
+      parentId: safeUser.parentId,
+      wallet: safeUser.wallet ? {
+        primaryBalance:   Number(safeUser.wallet.primaryBalance)   / 100,
+        secondaryBalance: Number(safeUser.wallet.secondaryBalance) / 100,
+        holdBalance:      Number(safeUser.wallet.holdBalance)      / 100,
       } : null,
+      kyc: safeUser.kyc,
     },
     accessToken,
     refreshToken,
@@ -132,13 +162,14 @@ export const getMe = async (userId: string) => {
     where: { id: userId },
     select: {
       id: true, name: true, email: true, phone: true, role: true,
-      isActive: true, isVerified: true, createdAt: true,
+      isActive: true, isVerified: true, createdAt: true, parentId: true,
       wallet: { select: { primaryBalance: true, secondaryBalance: true, holdBalance: true } },
       kyc:    { select: { status: true } },
-      parent: { select: { id: true, name: true, role: true } },
+      parent: { select: { id: true, name: true, email: true, role: true } },
     },
   });
   if (!user) throw new AppError('User not found', 404, 'NOT_FOUND');
+  
   return {
     ...user,
     wallet: user.wallet ? {

@@ -50,8 +50,8 @@ export default function PayOutPage() {
   const meta = historyData?.meta ?? { total: 0, totalPages: 1 };
 
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+    <div className="space-y-4 lg:space-y-5">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 lg:gap-5">
         {/* Form */}
         <div className="space-y-4">
           {wallet && <WalletCard primary={wallet.primaryBalance} secondary={wallet.secondaryBalance} hold={wallet.holdBalance} />}
@@ -74,10 +74,10 @@ export default function PayOutPage() {
               {/* Mode */}
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1.5">Transfer Mode</label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                   {(['IMPS', 'NEFT', 'UPI'] as Mode[]).map((m) => (
                     <button key={m} type="button" onClick={() => { setForm(f => ({ ...f, mode: m })); setUpiVerified(null); }}
-                      className={cn('py-2.5 rounded-lg text-xs font-semibold border transition-all',
+                      className={cn('py-2 px-1 sm:px-2.5 rounded-lg text-xs font-semibold border transition-all',
                         form.mode === m ? 'bg-brand-600 text-white border-brand-600' : 'bg-surface-850 text-slate-400 border-white/[0.06] hover:border-brand-500/40')}>
                       {m}
                     </button>
@@ -100,18 +100,19 @@ export default function PayOutPage() {
               {form.mode === 'UPI' && (
                 <div>
                   <label className="block text-xs font-medium text-slate-400 mb-1.5">UPI ID</label>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <input type="text" value={form.upiId} onChange={set('upiId')}
                       className="input flex-1" placeholder="name@upi" />
                     <button onClick={handleVerifyUpi} disabled={!form.upiId || verifyUpi.isPending}
-                      className="btn-secondary px-3 whitespace-nowrap disabled:opacity-50">
+                      className="btn-secondary px-3 whitespace-nowrap disabled:opacity-50 justify-center sm:justify-start">
                       {verifyUpi.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+                      <span className="hidden sm:inline ml-1">Verify</span>
                     </button>
                   </div>
                   {upiVerified && (
                     <div className={cn('mt-2 p-2 rounded-lg text-xs flex items-center gap-2',
                       upiVerified.valid ? 'bg-success/10 border border-success/20 text-success' : 'bg-danger/10 border border-danger/20 text-danger')}>
-                      {upiVerified.valid ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                      {upiVerified.valid ? <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />}
                       {upiVerified.valid ? `Verified: ${upiVerified.name}` : 'Invalid UPI ID'}
                     </div>
                   )}

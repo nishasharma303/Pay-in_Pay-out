@@ -1,10 +1,10 @@
-import { Response, NextFunction } from 'express';
+import { Response, NextFunction, Request } from 'express';
 import jwt from 'jsonwebtoken';
 import { Role } from '@prisma/client';
 import { AuthRequest, JwtPayload } from '../types';
 import { AppError } from './error';
 
-export const authenticate = (req: AuthRequest, res: Response, next: NextFunction) => {
+export const authenticate = (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
@@ -14,7 +14,7 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
 
   try {
     const payload = jwt.verify(token, process.env.JWT_ACCESS_SECRET!) as JwtPayload;
-    req.user = payload;
+    (req as AuthRequest).user = payload;
     next();
   } catch (err) {
     if (err instanceof jwt.TokenExpiredError) {
@@ -26,11 +26,12 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
 
 // Role-Based Access Control
 export const authorize = (...roles: Role[]) => {
-  return (req: AuthRequest, res: Response, next: NextFunction) => {
-    if (!req.user) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const authReq = req as AuthRequest;
+    if (!authReq.user) {
       return next(new AppError('Authentication required', 401, 'UNAUTHENTICATED'));
     }
-    if (!roles.includes(req.user.role)) {
+    if (!roles.includes(authReq.user.role)) {
       return next(new AppError('Insufficient permissions', 403, 'FORBIDDEN'));
     }
     next();
@@ -41,4 +42,5 @@ export const authorize = (...roles: Role[]) => {
 export const isSuperAdmin = authorize(Role.SUPER_ADMIN);
 export const isAdmin = authorize(Role.SUPER_ADMIN, Role.ADMIN);
 export const isClient = authorize(Role.SUPER_ADMIN, Role.ADMIN, Role.CLIENT);
+export const isAgent = authorize(Role.SUPER_ADMIN, Role.ADMIN, Role.AGENT);
 export const isAnyRole = authorize(Role.SUPER_ADMIN, Role.ADMIN, Role.CLIENT, Role.AGENT);

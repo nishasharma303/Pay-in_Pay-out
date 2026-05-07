@@ -3,12 +3,14 @@ import { z } from 'zod';
 import * as authService from '../services/auth.service';
 import { AuthRequest } from '../types';
 import { sendSuccess } from '../utils/response';
+import { Role } from '@prisma/client';
 
 const registerSchema = z.object({
   name:     z.string().min(2),
   email:    z.string().email(),
   phone:    z.string().min(10).max(15).regex(/^\d+$/, 'Phone must contain only digits'),
-  password: z.string().min(6),  // relaxed — min 6 chars only
+  password: z.string().min(6),
+  role:     z.enum(['CLIENT', 'AGENT']).optional().default('CLIENT'),
 });
 
 const loginSchema = z.object({
@@ -27,9 +29,49 @@ const getCookieOpts = () => ({
 export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = registerSchema.parse(req.body);
-    const user = await authService.registerUser(data);
-    sendSuccess(res, user, 'Account created successfully', 201);
-  } catch (err) { next(err); }
+    
+    // Check if trying to create AGENT account
+    if (data.role === 'AGENT') {
+      // Check if requester is admin (if authorization header exists)
+      const authReq = req as AuthRequest;
+      const userRole = authReq.user?.role as string;
+      const isAdmin = userRole === 'SUPER_ADMIN' || userRole === 'ADMIN';
+      
+      if (authReq.user && isAdmin) {
+        // Admin can create agent - pass all required fields
+        const user = await authService.registerUser({
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          password: data.password,
+          role: Role.AGENT
+        });
+        sendSuccess(res, user, 'Agent account created successfully', 201);
+      } else {
+        // Non-admin trying to create agent - create as CLIENT instead
+        const user = await authService.registerUser({
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          password: data.password,
+          role: Role.CLIENT
+        });
+        sendSuccess(res, user, 'Account created successfully', 201);
+      }
+    } else {
+      // Normal CLIENT registration
+      const user = await authService.registerUser({
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        password: data.password,
+        role: Role.CLIENT
+      });
+      sendSuccess(res, user, 'Account created successfully', 201);
+    }
+  } catch (err) { 
+    next(err); 
+  }
 };
 
 export const login = async (req: Request, res: Response, next: NextFunction) => {
@@ -42,7 +84,9 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       accessToken:  result.accessToken,
       refreshToken: result.refreshToken,
     }, 'Login successful');
-  } catch (err) { next(err); }
+  } catch (err) { 
+    next(err); 
+  }
 };
 
 export const refresh = async (req: Request, res: Response, next: NextFunction) => {
@@ -61,7 +105,9 @@ export const refresh = async (req: Request, res: Response, next: NextFunction) =
     const result = await authService.refreshAccessToken(token);
     res.cookie('refreshToken', result.refreshToken, getCookieOpts());
     sendSuccess(res, { accessToken: result.accessToken, refreshToken: result.refreshToken });
-  } catch (err) { next(err); }
+  } catch (err) { 
+    next(err); 
+  }
 };
 
 export const logout = async (req: Request, res: Response, next: NextFunction) => {
@@ -70,11 +116,17 @@ export const logout = async (req: Request, res: Response, next: NextFunction) =>
     if (token) await authService.logoutUser(token.trim());
     res.clearCookie('refreshToken', { path: '/' });
     sendSuccess(res, null, 'Logged out successfully');
-  } catch (err) { next(err); }
+  } catch (err) { 
+    next(err); 
+  }
 };
 
-export const me = async (req: AuthRequest, res: Response, next: NextFunction) => {
+export const me = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    sendSuccess(res, await authService.getMe(req.user.userId));
-  } catch (err) { next(err); }
+    const authReq = req as AuthRequest;
+    const user = await authService.getMe(authReq.user.userId);
+    sendSuccess(res, user);
+  } catch (err) { 
+    next(err); 
+  }
 };

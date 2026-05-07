@@ -97,8 +97,8 @@ export default function PayInPage() {
   };
 
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+    <div className="space-y-4 lg:space-y-5">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 lg:gap-5">
         {/* Form */}
         <div className="space-y-4">
           {wallet && (
@@ -165,7 +165,7 @@ export default function PayInPage() {
               {/* Quick amounts */}
               <div>
                 <p className="text-2xs text-gray-400 mb-2">Quick select</p>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 sm:gap-2">
                   {QUICK_AMOUNTS.map((a) => (
                     <button
                       key={a}

@@ -4,14 +4,13 @@ import { authenticate, isAnyRole } from '../middlewares/auth';
 
 export const payoutRouter = Router();
 
-// Cashfree webhook — raw body, no auth
 payoutRouter.post(
   '/webhook',
-  raw({ type: 'application/json' }),
-  (req, res, next) => { 
+  raw({ type: 'application/json' }) as any,
+  ((req: any, res: any, next: any) => { 
     (req as any).rawBody = req.body.toString('utf8'); 
     next(); 
-  },
+  }) as any,
   payoutController.webhook as any
 );
 

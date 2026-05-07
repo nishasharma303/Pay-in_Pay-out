@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, ArrowDownCircle, ArrowUpCircle, BookOpen, Users, Percent, Grid3x3, ShieldCheck, Settings, Zap, LogOut, ChevronRight, Wallet, FileCheck, Crown, LucideIcon } from 'lucide-react';
+import { LayoutDashboard, ArrowDownCircle, ArrowUpCircle, BookOpen, Users, Percent, Grid3x3, ShieldCheck, Settings, Zap, LogOut, ChevronRight, Wallet, FileCheck, Crown, LucideIcon, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
 import { useLogout } from '@/hooks/use-auth';
@@ -72,7 +72,12 @@ const NAV: NavItem[] = [
   },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { user } = useAuthStore();
   const logout = useLogout();
@@ -87,17 +92,54 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="w-56 flex-shrink-0 flex flex-col bg-white border-r border-gray-200 h-full shadow-sm">
-      {/* Logo */}
-      <div className="flex items-center gap-2.5 px-4 py-5 border-b border-gray-100">
-        <div className="w-8 h-8 bg-gradient-to-r from-brand-600 to-brand-500 rounded-xl flex items-center justify-center flex-shrink-0">
-          <Zap className="w-4 h-4 text-white" />
+    <>
+      {/* Mobile overlay */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={onClose}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside className={cn(
+        "flex flex-col bg-white border-r border-gray-200 shadow-sm transition-all duration-300 ease-in-out",
+        // Desktop: fixed width
+        "w-56 flex-shrink-0 h-full",
+        // Mobile: full width overlay
+        "fixed inset-y-0 left-0 z-50 lg:static lg:z-auto",
+        "transform lg:transform-none",
+        isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+      )}>
+        {/* Mobile close button */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 lg:hidden">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 bg-gradient-to-r from-brand-600 to-brand-500 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Zap className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold tracking-tight text-gray-900">PayFlow</p>
+              <p className="text-[10px] text-gray-400">Fintech Platform</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
-        <div>
-          <p className="text-sm font-semibold tracking-tight text-gray-900">PayFlow</p>
-          <p className="text-[10px] text-gray-400">Fintech Platform</p>
+
+        {/* Desktop logo */}
+        <div className="hidden lg:flex items-center gap-2.5 px-4 py-5 border-b border-gray-100">
+          <div className="w-8 h-8 bg-gradient-to-r from-brand-600 to-brand-500 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Zap className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold tracking-tight text-gray-900">PayFlow</p>
+            <p className="text-[10px] text-gray-400">Fintech Platform</p>
+          </div>
         </div>
-      </div>
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
@@ -170,6 +212,7 @@ export function Sidebar() {
           <span>Sign out</span>
         </button>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
