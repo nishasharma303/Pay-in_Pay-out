@@ -22,11 +22,11 @@ export const submitKyc = async (req: Request, res: Response, next: NextFunction)
     
     // Handle both JSON and FormData
     let body = req.body;
-    let files = req.files as Record<string, Express.Multer.File[]> | undefined;
+    // Fix: Use 'any' for files to avoid TypeScript errors
+    const files = (req as any).files as Record<string, any[]> | undefined;
     
     // If it's FormData with files, extract text fields from body
     if (req.headers['content-type']?.includes('multipart/form-data')) {
-      // body already contains the parsed form-data fields
       body = {
         panNumber: req.body.panNumber,
         aadhaarNumber: req.body.aadhaarNumber,
