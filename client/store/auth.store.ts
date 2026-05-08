@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { setCookie, removeCookie } from '@/lib/cookies';
 
 export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'CLIENT' | 'AGENT';
 
@@ -33,22 +34,24 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
 
       setAuth: (user, accessToken, refreshToken) => {
-        // Store refresh token and access token in localStorage as backup
+        // Store in localStorage (for components)
         if (typeof window !== 'undefined') {
           if (refreshToken) {
             localStorage.setItem('pf_refresh', refreshToken);
+            setCookie('pf_refresh', refreshToken, 7); // ← Set cookie for middleware
           }
           if (accessToken) {
             localStorage.setItem('pf_access', accessToken);
+            setCookie('pf_access', accessToken, 1); // Access token expires in 1 day
           }
         }
         set({ user, accessToken, isAuthenticated: true });
       },
 
       setAccessToken: (accessToken) => {
-        // Also update localStorage when access token is refreshed
         if (typeof window !== 'undefined' && accessToken) {
           localStorage.setItem('pf_access', accessToken);
+          setCookie('pf_access', accessToken, 1);
         }
         set({ accessToken });
       },
@@ -59,13 +62,14 @@ export const useAuthStore = create<AuthState>()(
         if (typeof window !== 'undefined') {
           localStorage.removeItem('pf_refresh');
           localStorage.removeItem('pf_access');
+          removeCookie('pf_refresh');
+          removeCookie('pf_access');
         }
         set({ user: null, accessToken: null, isAuthenticated: false });
       },
     }),
     {
       name: 'payflow-auth',
-      // Only persist user info — access token lives in memory and localStorage separately
       partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
     }
   )
