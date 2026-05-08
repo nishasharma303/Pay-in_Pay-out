@@ -20,10 +20,32 @@ import { servicesRouter }   from './routes/services.routes';
 const app = express();
 
 app.use(helmet());
+
+// ✅ FIXED CORS configuration - Allow your Vercel frontend
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'https://pay-in-pay-out-xi.vercel.app',
+  'https://pay-in-pay-out-git-main-nisha-sharmas-projects-ad59703f.vercel.app',
+  'https://pay-in-pay-98wolnrx9-nisha-sharmas-projects-ad59703f.vercel.app',
+];
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is allowed
+    if (allowedOrigins.includes(origin) || origin.includes('vercel.app')) {
+      callback(null, true);
+    } else {
+      console.log('❌ CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-refresh-token', 'Cookie'],
 }));
 
 app.use('/api/pay-in/webhook',  express.raw({ type: 'application/json' }));
