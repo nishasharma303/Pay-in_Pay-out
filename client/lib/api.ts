@@ -9,10 +9,23 @@ export const api = axios.create({
   headers:         { 'Content-Type': 'application/json' },
 });
 
-// Attach access token
+// Attach access token - checks both store and localStorage
 api.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().accessToken;
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  // Try to get token from store first
+  let token = useAuthStore.getState().accessToken;
+  
+  // If not in store, try localStorage as fallback
+  if (!token && typeof window !== 'undefined') {
+    token = localStorage.getItem('pf_access');
+    // If found in localStorage, update the store
+    if (token) {
+      useAuthStore.getState().setAccessToken(token);
+    }
+  }
+  
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
   return config;
 });
 
@@ -27,6 +40,7 @@ const processQueue = (error: unknown, token: string | null = null) => {
 const clearAuthAndRedirect = () => {
   if (typeof window !== 'undefined') {
     localStorage.removeItem('pf_refresh');
+    localStorage.removeItem('pf_access');
     localStorage.removeItem('payflow-auth');
   }
   useAuthStore.getState().logout();
@@ -64,21 +78,34 @@ api.interceptors.response.use(
           ? localStorage.getItem('pf_refresh')
           : null;
 
+        if (!storedRefresh) {
+          throw new Error('No refresh token available');
+        }
+
         const { data } = await axios.post(
           `${BASE_URL}/api/auth/refresh`,
           {},
           {
             withCredentials: true,
-            headers: storedRefresh ? { 'x-refresh-token': storedRefresh } : {},
+            headers: { 'x-refresh-token': storedRefresh },
           }
         );
 
-        const newAccess  = data.data.accessToken;
-        const newRefresh = data.data.refreshToken;
+        const newAccess = data.data?.accessToken;
+        const newRefresh = data.data?.refreshToken;
 
+        if (!newAccess) {
+          throw new Error('No access token in refresh response');
+        }
+
+        // Update store and localStorage with new tokens
         useAuthStore.getState().setAccessToken(newAccess);
+        
         if (newRefresh && typeof window !== 'undefined') {
           localStorage.setItem('pf_refresh', newRefresh);
+        }
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('pf_access', newAccess);
         }
 
         processQueue(null, newAccess);

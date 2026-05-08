@@ -33,27 +33,39 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
 
       setAuth: (user, accessToken, refreshToken) => {
-        // Store refresh token in localStorage as fallback for dev (cross-port cookie issues)
-        if (refreshToken && typeof window !== 'undefined') {
-          localStorage.setItem('pf_refresh', refreshToken);
+        // Store refresh token and access token in localStorage as backup
+        if (typeof window !== 'undefined') {
+          if (refreshToken) {
+            localStorage.setItem('pf_refresh', refreshToken);
+          }
+          if (accessToken) {
+            localStorage.setItem('pf_access', accessToken);
+          }
         }
         set({ user, accessToken, isAuthenticated: true });
       },
 
-      setAccessToken: (accessToken) => set({ accessToken }),
+      setAccessToken: (accessToken) => {
+        // Also update localStorage when access token is refreshed
+        if (typeof window !== 'undefined' && accessToken) {
+          localStorage.setItem('pf_access', accessToken);
+        }
+        set({ accessToken });
+      },
 
       setUser: (user) => set({ user }),
 
       logout: () => {
         if (typeof window !== 'undefined') {
           localStorage.removeItem('pf_refresh');
+          localStorage.removeItem('pf_access');
         }
         set({ user: null, accessToken: null, isAuthenticated: false });
       },
     }),
     {
       name: 'payflow-auth',
-      // Only persist user info — access token lives in memory only
+      // Only persist user info — access token lives in memory and localStorage separately
       partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
     }
   )
