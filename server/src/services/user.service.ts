@@ -10,18 +10,29 @@ export const listUsers = async (
 ) => {
   const { page, limit, skip } = getPaginationParams(query);
 
-  // Build hierarchy filter: each role can only see their downstream users
+  // Build hierarchy filter: each role can only see their direct children
   const roleFilter: Role[] = [];
+  let hierarchyFilter: any = {};
+
   if (requesterRole === Role.SUPER_ADMIN) {
+    // SUPER_ADMIN sees all users except themselves
     roleFilter.push(Role.ADMIN, Role.CLIENT, Role.AGENT);
+    hierarchyFilter = {}; // No filter needed
   } else if (requesterRole === Role.ADMIN) {
+    // ADMIN sees only CLIENTs and AGENTs they created
     roleFilter.push(Role.CLIENT, Role.AGENT);
+    hierarchyFilter = { parentId: requesterId };
   } else if (requesterRole === Role.CLIENT) {
+    // CLIENT sees only AGENTs they created
     roleFilter.push(Role.AGENT);
+    hierarchyFilter = { parentId: requesterId };
+  } else if (requesterRole === Role.AGENT) {
+    // AGENT cannot see any users
+    return { users: [], meta: { page, limit, total: 0, totalPages: 0 } };
   }
 
   const where = {
-    ...(requesterRole !== Role.SUPER_ADMIN && { parentId: requesterId }),
+    ...hierarchyFilter,
     ...(query.role && { role: query.role as Role }),
     ...(query.search && {
       OR: [
@@ -40,8 +51,14 @@ export const listUsers = async (
       take: limit,
       orderBy: { createdAt: 'desc' },
       select: {
-        id: true, name: true, email: true, phone: true, role: true,
-        isActive: true, isVerified: true, createdAt: true,
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true,
+        isActive: true,
+        isVerified: true,
+        createdAt: true,
         kyc: { select: { status: true } },
         wallet: { select: { primaryBalance: true } },
         _count: { select: { children: true } },
@@ -51,7 +68,7 @@ export const listUsers = async (
   ]);
 
   return {
-    users: users.map(u => ({
+    users: users.map((u) => ({
       ...u,
       wallet: u.wallet ? { primaryBalance: Number(u.wallet.primaryBalance) / 100 } : null,
     })),
@@ -63,8 +80,15 @@ export const getUserById = async (id: string) => {
   const user = await prisma.user.findUnique({
     where: { id },
     select: {
-      id: true, name: true, email: true, phone: true, role: true,
-      isActive: true, isVerified: true, createdAt: true, updatedAt: true,
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      role: true,
+      isActive: true,
+      isVerified: true,
+      createdAt: true,
+      updatedAt: true,
       parent: { select: { id: true, name: true, role: true } },
       kyc: true,
       wallet: { select: { primaryBalance: true, secondaryBalance: true, holdBalance: true } },
@@ -74,11 +98,13 @@ export const getUserById = async (id: string) => {
   if (!user) throw new AppError('User not found', 404, 'NOT_FOUND');
   return {
     ...user,
-    wallet: user.wallet ? {
-      primaryBalance: Number(user.wallet.primaryBalance) / 100,
-      secondaryBalance: Number(user.wallet.secondaryBalance) / 100,
-      holdBalance: Number(user.wallet.holdBalance) / 100,
-    } : null,
+    wallet: user.wallet
+      ? {
+          primaryBalance: Number(user.wallet.primaryBalance) / 100,
+          secondaryBalance: Number(user.wallet.secondaryBalance) / 100,
+          holdBalance: Number(user.wallet.holdBalance) / 100,
+        }
+      : null,
   };
 };
 

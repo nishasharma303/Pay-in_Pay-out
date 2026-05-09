@@ -16,16 +16,23 @@ api.interceptors.request.use((config) => {
   
   // If not in store, try localStorage as fallback
   if (!token && typeof window !== 'undefined') {
-    token = localStorage.getItem('pf_access');
-    // If found in localStorage, update the store
-    if (token) {
+    const stored = localStorage.getItem('pf_access');
+    if (stored) {
+      token = stored;
+      // Update the store so it has the token
       useAuthStore.getState().setAccessToken(token);
     }
   }
   
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  if (token && token.trim()) {
+    config.headers.Authorization = `Bearer ${token.trim()}`;
   }
+  
+  // Log in development mode
+  if (process.env.NODE_ENV === 'development' && !token) {
+    console.warn('⚠️ No auth token found for request to', config.url);
+  }
+  
   return config;
 });
 

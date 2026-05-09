@@ -13,7 +13,7 @@ export const creditWallet = async (
 ) => {
   return prisma.$transaction(async (tx) => {
     const wallet = await tx.$queryRaw<Array<{ id: string; primaryBalance: bigint }>>`
-      SELECT id, "primaryBalance" FROM "Wallet" WHERE "userId" = ${userId} FOR UPDATE`;
+      SELECT id, \`primaryBalance\` FROM \`Wallet\` WHERE \`userId\` = ${userId} FOR UPDATE`;
     if (!wallet[0]) throw new AppError('Wallet not found', 404, 'WALLET_NOT_FOUND');
     const newBalance = wallet[0].primaryBalance + amountPaise;
     await tx.wallet.update({ where: { userId }, data: { primaryBalance: newBalance } });
@@ -35,7 +35,7 @@ export const debitWallet = async (
 ) => {
   return prisma.$transaction(async (tx) => {
     const wallet = await tx.$queryRaw<Array<{ id: string; primaryBalance: bigint }>>`
-      SELECT id, "primaryBalance" FROM "Wallet" WHERE "userId" = ${userId} FOR UPDATE`;
+      SELECT id, \`primaryBalance\` FROM \`Wallet\` WHERE \`userId\` = ${userId} FOR UPDATE`;
     if (!wallet[0]) throw new AppError('Wallet not found', 404, 'WALLET_NOT_FOUND');
     if (wallet[0].primaryBalance < amountPaise) {
       throw new AppError(
@@ -60,7 +60,7 @@ export const debitWallet = async (
 export const holdBalance = async (userId: string, amountPaise: bigint, reason: string) => {
   return prisma.$transaction(async (tx) => {
     const wallet = await tx.$queryRaw<Array<{ id: string; primaryBalance: bigint; holdBalance: bigint }>>`
-      SELECT id, "primaryBalance", "holdBalance" FROM "Wallet" WHERE "userId" = ${userId} FOR UPDATE`;
+      SELECT id, \`primaryBalance\`, \`holdBalance\` FROM \`Wallet\` WHERE \`userId\` = ${userId} FOR UPDATE`;
     if (!wallet[0]) throw new AppError('Wallet not found', 404, 'WALLET_NOT_FOUND');
     if (wallet[0].primaryBalance < amountPaise)
       throw new AppError('Insufficient balance to hold', 400, 'INSUFFICIENT_BALANCE');
@@ -82,7 +82,7 @@ export const holdBalance = async (userId: string, amountPaise: bigint, reason: s
 export const releaseHold = async (userId: string, amountPaise: bigint, creditBack: boolean, reason: string) => {
   return prisma.$transaction(async (tx) => {
     const wallet = await tx.$queryRaw<Array<{ id: string; primaryBalance: bigint; holdBalance: bigint }>>`
-      SELECT id, "primaryBalance", "holdBalance" FROM "Wallet" WHERE "userId" = ${userId} FOR UPDATE`;
+      SELECT id, \`primaryBalance\`, \`holdBalance\` FROM \`Wallet\` WHERE \`userId\` = ${userId} FOR UPDATE`;
     if (!wallet[0]) throw new AppError('Wallet not found', 404, 'WALLET_NOT_FOUND');
     const newHold    = wallet[0].holdBalance - amountPaise < 0n ? 0n : wallet[0].holdBalance - amountPaise;
     const newPrimary = creditBack ? wallet[0].primaryBalance + amountPaise : wallet[0].primaryBalance;
@@ -104,7 +104,7 @@ export const releaseHold = async (userId: string, amountPaise: bigint, creditBac
 export const transferSecondaryToPrimary = async (userId: string, amountPaise: bigint) => {
   return prisma.$transaction(async (tx) => {
     const wallet = await tx.$queryRaw<Array<{ id: string; primaryBalance: bigint; secondaryBalance: bigint }>>`
-      SELECT id, "primaryBalance", "secondaryBalance" FROM "Wallet" WHERE "userId" = ${userId} FOR UPDATE`;
+      SELECT id, \`primaryBalance\`, \`secondaryBalance\` FROM \`Wallet\` WHERE \`userId\` = ${userId} FOR UPDATE`;
     if (!wallet[0]) throw new AppError('Wallet not found', 404, 'WALLET_NOT_FOUND');
     if (wallet[0].secondaryBalance < amountPaise)
       throw new AppError(
@@ -126,6 +126,7 @@ export const transferSecondaryToPrimary = async (userId: string, amountPaise: bi
   });
 };
 
+// Rest of the file remains the same (adminTopUp, getWalletBalance, getLedger, etc.)
 export const adminTopUp = async (targetUserId: string, adminId: string, amountPaise: bigint, note?: string) => {
   const result = await creditWallet(
     targetUserId, amountPaise,

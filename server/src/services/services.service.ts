@@ -101,9 +101,12 @@ export const processService = async (userId: string, payload: ServicePayload) =>
       data:  { status: TransactionStatus.SUCCESS },
     });
 
+    
+
     // Distribute commissions — don't fail main transaction if this errors
     try {
-      const { distributeCommissions } = await import('./commission.service');
+      // Correct import - note the full path
+      const { distributeCommissions } = await import('./commission.service.js');
       await distributeCommissions(userId, transaction.id, amount, serviceType);
     } catch { /* commission failure is non-fatal */ }
 

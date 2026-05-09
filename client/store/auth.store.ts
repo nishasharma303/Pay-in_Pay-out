@@ -24,6 +24,7 @@ interface AuthState {
   setAccessToken: (token: string) => void;
   setUser: (user: AuthUser) => void;
   logout: () => void;
+  hydrate: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -32,6 +33,21 @@ export const useAuthStore = create<AuthState>()(
       user:            null,
       accessToken:     null,
       isAuthenticated: false,
+
+      hydrate: () => {
+        if (typeof window !== 'undefined') {
+          const storedAccess = localStorage.getItem('pf_access');
+          const storedUser = localStorage.getItem('payflow-auth');
+          if (storedAccess || storedUser) {
+            const user = storedUser ? JSON.parse(storedUser).state?.user : null;
+            set({
+              accessToken: storedAccess || null,
+              user: user || null,
+              isAuthenticated: !!storedAccess && !!user,
+            });
+          }
+        }
+      },
 
       setAuth: (user, accessToken, refreshToken) => {
         // Store in localStorage (for components)

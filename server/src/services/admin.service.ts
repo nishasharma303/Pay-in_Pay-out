@@ -66,11 +66,11 @@ export const getDashboardStats = async (adminId: string, role: Role) => {
     }),
 
     // Users by role breakdown
-    prisma.user.groupBy({
+    (prisma.user.groupBy({
       by: ['role'],
       _count: true,
-      where: { ...userScope },
-    }),
+      where: userScope as any,
+    }) as any),
 
     // Daily volume — last 30 days
     prisma.$queryRaw<Array<{ date: string; credit: bigint; debit: bigint; count: bigint }>>`
@@ -167,19 +167,19 @@ export const getTransactionReport = async (from?: string, to?: string, type?: Tr
   };
 
   const [byType, byStatus, totals] = await prisma.$transaction([
-    prisma.transaction.groupBy({
+    (prisma.transaction.groupBy({
       by: ['type'],
-      where,
+      where: where as any,
       _sum: { amount: true },
       _count: true,
-    }),
-    prisma.transaction.groupBy({
+    }) as any),
+    (prisma.transaction.groupBy({
       by: ['status'],
       _count: true,
       where: {
         ...(from || to ? { createdAt: { ...(from && { gte: new Date(from) }), ...(to && { lte: new Date(to + 'T23:59:59') }) } } : {}),
-      },
-    }),
+      } as any,
+    }) as any),
     prisma.transaction.aggregate({
       where,
       _sum: { amount: true },

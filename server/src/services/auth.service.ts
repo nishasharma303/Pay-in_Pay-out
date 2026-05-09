@@ -7,9 +7,13 @@ import {
   verifyRefreshToken, getRefreshTokenExpiry,
 } from '../utils/jwt';
 
-export const registerUser = async (data: {
+/**
+ * Internal user creation function - used only by role-based creation endpoints
+ * Do NOT expose for public registration
+ */
+export const createUserByRole = async (data: {
   name: string; email: string; phone: string; password: string;
-  role?: Role; parentId?: string;
+  role: Role; parentId: string;
 }) => {
   const existing = await prisma.user.findFirst({
     where: { OR: [{ email: data.email }, { phone: data.phone }] },
@@ -23,22 +27,13 @@ export const registerUser = async (data: {
 
   const passwordHash = await bcrypt.hash(data.password, 10);
   
-  // Default role: CLIENT (not AGENT) for public registration
-  // AGENT can only be created by admins
-  let userRole = data.role || Role.CLIENT;
-  
-  // If someone tries to register as AGENT without admin privileges, default to CLIENT
-  if (userRole === Role.AGENT && !data.parentId) {
-    userRole = Role.CLIENT;
-  }
-  
   const user = await prisma.user.create({
     data: {
       name: data.name, 
       email: data.email, 
       phone: data.phone,
       passwordHash, 
-      role: userRole, 
+      role: data.role, 
       parentId: data.parentId,
       wallet: { create: { primaryBalance: 0n, secondaryBalance: 0n, holdBalance: 0n } },
     },
@@ -49,7 +44,7 @@ export const registerUser = async (data: {
   });
 
   await prisma.auditLog.create({
-    data: { userId: user.id, action: 'USER_REGISTERED', entity: 'User', entityId: user.id },
+    data: { userId: data.parentId, action: 'USER_CREATED', entity: 'User', entityId: user.id, metadata: { targetRole: data.role } },
   });
   return user;
 };

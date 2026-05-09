@@ -1,10 +1,11 @@
 'use client';
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { useSuperStats, useMasterWallet, useFeatureFlags } from '@/hooks/use-admin';
 import { Card, CardHeader, CardTitle, CardContent, StatCard, Skeleton } from '@/components/ui';
 import { formatCurrency, cn } from '@/lib/utils';
 import { api } from '@/lib/api';
+import { CreateAdminModal } from '@/components/dashboard/create-admin-modal';
 import { AlertCircle, Loader2, Plus, Shield, ToggleLeft, ToggleRight, Users, Wallet, Zap } from 'lucide-react';
 
 const FLAG_DESCRIPTIONS: Record<string, string> = {
@@ -19,10 +20,7 @@ export default function SuperAdminPage() {
   const { data: stats, isLoading } = useSuperStats();
   const { data: masterWallet } = useMasterWallet();
   const { data: flags, refetch: refetchFlags } = useFeatureFlags();
-  const qc = useQueryClient();
-  const [adminForm, setAdminForm] = useState({ name: '', email: '', phone: '', password: '' });
   const [showCreateAdmin, setShowCreateAdmin] = useState(false);
-  const [createError, setCreateError] = useState('');
 
   const setFlag = useMutation({
     mutationFn: async ({ key, value }: { key: string; value: boolean }) => {
@@ -31,22 +29,9 @@ export default function SuperAdminPage() {
     onSuccess: () => refetchFlags(),
   });
 
-  const createAdmin = useMutation({
-    mutationFn: async () => {
-      setCreateError('');
-      const { data } = await api.post('/admin/super/admins', adminForm);
-      return data;
-    },
-    onSuccess: () => {
-      setAdminForm({ name: '', email: '', phone: '', password: '' });
-      setShowCreateAdmin(false);
-      qc.invalidateQueries({ queryKey: ['users'] });
-    },
-    onError: (err: any) => setCreateError(err?.response?.data?.error?.message || 'Failed to create admin'),
-  });
-
   return (
-    <div className="space-y-5">
+    <>
+      <div className="space-y-5">
       {/* System stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Total Users" value={isLoading ? '…' : String(stats?.users ?? 0)} loading={isLoading}
@@ -117,40 +102,16 @@ export default function SuperAdminPage() {
       {/* Create admin */}
       <Card>
         <CardHeader>
-          <CardTitle>Admin Users</CardTitle>
-          <button onClick={() => setShowCreateAdmin(s => !s)} className="btn-primary py-1.5">
-            <Plus className="w-3.5 h-3.5" /> {showCreateAdmin ? 'Cancel' : 'Create Admin'}
+          <CardTitle>Admin Management</CardTitle>
+          <button onClick={() => setShowCreateAdmin(true)} className="btn-primary py-1.5">
+            <Plus className="w-3.5 h-3.5" /> Create Admin
           </button>
         </CardHeader>
-        {showCreateAdmin && (
-          <CardContent className="space-y-4">
-            {createError && (
-              <div className="flex items-start gap-2 p-3 rounded-lg bg-danger/10 border border-danger/20">
-                <AlertCircle className="w-4 h-4 text-danger flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-danger">{createError}</p>
-              </div>
-            )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {[
-                { key: 'name', label: 'Full Name', placeholder: 'John Doe', type: 'text' },
-                { key: 'email', label: 'Email', placeholder: 'admin@example.com', type: 'email' },
-                { key: 'phone', label: 'Phone', placeholder: '9876543210', type: 'tel' },
-                { key: 'password', label: 'Password', placeholder: 'Min 8 characters', type: 'password' },
-              ].map((f) => (
-                <div key={f.key}>
-                  <label className="block text-xs font-medium text-slate-400 mb-1.5">{f.label}</label>
-                  <input type={f.type} value={adminForm[f.key as keyof typeof adminForm]}
-                    onChange={(e) => setAdminForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                    className="input" placeholder={f.placeholder} />
-                </div>
-              ))}
-            </div>
-            <button onClick={() => createAdmin.mutate()} disabled={createAdmin.isPending || !adminForm.name || !adminForm.email}
-              className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
-              {createAdmin.isPending ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating...</> : 'Create Admin'}
-            </button>
-          </CardContent>
-        )}
+        <CardContent>
+          <p className="text-sm text-slate-400">
+            Create new admin users who can manage clients and oversee platform operations.
+          </p>
+        </CardContent>
       </Card>
 
       {/* User growth chart */}
@@ -176,5 +137,8 @@ export default function SuperAdminPage() {
         </Card>
       )}
     </div>
+
+    <CreateAdminModal isOpen={showCreateAdmin} onClose={() => setShowCreateAdmin(false)} />
+    </>
   );
 }

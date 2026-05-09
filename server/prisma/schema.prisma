@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -54,15 +54,15 @@ enum PayoutMode {
 
 model User {
   id           String   @id @default(cuid())
-  email        String   @unique
-  phone        String?  @unique
-  name         String
-  passwordHash String
+  email        String   @unique @db.VarChar(255)
+  phone        String?  @unique @db.VarChar(20)
+  name         String   @db.VarChar(255)
+  passwordHash String   @db.VarChar(255)
   role         Role     @default(AGENT)
   isActive     Boolean  @default(true)
   isVerified   Boolean  @default(false)
 
-  // Hierarchy: a user can have a parent (e.g., agent → client → admin)
+  // Hierarchy: tracks who created this user
   parentId     String?
   parent       User?    @relation("UserHierarchy", fields: [parentId], references: [id])
   children     User[]   @relation("UserHierarchy")
@@ -74,8 +74,8 @@ model User {
   transactions  Transaction[] @relation("UserTransactions")
   commissionsEarned Commission[] @relation("CommissionRecipient")
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now()) @db.Timestamp(0)
+  updatedAt    DateTime @updatedAt @db.Timestamp(0)
 
   @@index([role])
   @@index([parentId])
@@ -83,11 +83,11 @@ model User {
 
 model RefreshToken {
   id        String   @id @default(cuid())
-  token     String   @unique
+  token     String   @unique @db.VarChar(500)
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expiresAt DateTime
-  createdAt DateTime @default(now())
+  expiresAt DateTime @db.Timestamp(0)
+  createdAt DateTime @default(now()) @db.Timestamp(0)
 
   @@index([userId])
 }
@@ -99,26 +99,26 @@ model KycDetail {
   userId         String    @unique
   user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  panNumber      String?
-  aadhaarNumber  String?   // Store masked: XXXX-XXXX-1234
-  bankName       String?
-  accountNumber  String?   // Store encrypted in production
-  ifscCode       String?
-  accountHolder  String?
+  panNumber      String?   @db.VarChar(20)
+  aadhaarNumber  String?   @db.VarChar(20)   // Store masked: XXXX-XXXX-1234
+  bankName       String?   @db.VarChar(100)
+  accountNumber  String?   @db.VarChar(50)   // Store encrypted in production
+  ifscCode       String?   @db.VarChar(20)
+  accountHolder  String?   @db.VarChar(255)
 
   // Document image paths (store S3/Cloudinary URLs)
-  panImageUrl    String?
-  aadhaarFrontUrl String?
-  aadhaarBackUrl String?
-  selfieUrl      String?
+  panImageUrl    String?   @db.VarChar(500)
+  aadhaarFrontUrl String?  @db.VarChar(500)
+  aadhaarBackUrl String?   @db.VarChar(500)
+  selfieUrl      String?   @db.VarChar(500)
 
   status         KycStatus @default(PENDING)
-  reviewNote     String?   // Admin note on rejection
-  reviewedAt     DateTime?
+  reviewNote     String?   @db.Text
+  reviewedAt     DateTime? @db.Timestamp(0)
   reviewedById   String?
 
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime  @default(now()) @db.Timestamp(0)
+  updatedAt      DateTime  @updatedAt @db.Timestamp(0)
 }
 
 // ─── Wallet & Ledger ──────────────────────────────────────────────────────────
@@ -136,8 +136,8 @@ model Wallet {
 
   ledgerEntries    LedgerEntry[]
 
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime @default(now()) @db.Timestamp(0)
+  updatedAt        DateTime @updatedAt @db.Timestamp(0)
 }
 
 model LedgerEntry {
@@ -149,13 +149,13 @@ model LedgerEntry {
   amount          BigInt          // In paise
   balanceAfter    BigInt          // Running balance after this entry (in paise)
 
-  description     String
-  referenceId     String?         // Transaction ID or external ref
+  description     String          @db.Text
+  referenceId     String?         @db.VarChar(255)  // Transaction ID or external ref
   transactionId   String?
   transaction     Transaction?    @relation(fields: [transactionId], references: [id])
 
   metadata        Json?           // Extra data (biller name, etc.)
-  createdAt       DateTime        @default(now())
+  createdAt       DateTime        @default(now()) @db.Timestamp(0)
 
   @@index([walletId])
   @@index([referenceId])
@@ -177,29 +177,29 @@ model Transaction {
   netAmount       BigInt            // amount - fee
 
   // External references
-  gatewayOrderId  String?           // Razorpay order ID / Cashfree order ID
-  gatewayPaymentId String?          // Razorpay payment ID
-  gatewayRef      String?           // Any gateway reference
+  gatewayOrderId  String?           @db.VarChar(255)  // Razorpay order ID / Cashfree order ID
+  gatewayPaymentId String?          @db.VarChar(255)  // Razorpay payment ID
+  gatewayRef      String?           @db.VarChar(255)  // Any gateway reference
 
   // Payout specific
   payoutMode      PayoutMode?
-  beneficiaryName String?
-  accountNumber   String?
-  ifscCode        String?
-  upiId           String?
+  beneficiaryName String?           @db.VarChar(255)
+  accountNumber   String?           @db.VarChar(50)
+  ifscCode        String?           @db.VarChar(20)
+  upiId           String?           @db.VarChar(100)
 
   // Webhook idempotency
-  webhookEventId  String?           @unique
+  webhookEventId  String?           @unique @db.VarChar(255)
 
-  description     String?
-  failureReason   String?
+  description     String?           @db.Text
+  failureReason   String?           @db.Text
   metadata        Json?
 
   ledgerEntries   LedgerEntry[]
   commissions     Commission[]
 
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  createdAt       DateTime          @default(now()) @db.Timestamp(0)
+  updatedAt       DateTime          @updatedAt @db.Timestamp(0)
 
   @@index([userId])
   @@index([status])
@@ -213,13 +213,13 @@ model Transaction {
 model CommissionRule {
   id            String   @id @default(cuid())
   role          Role     // Who earns this commission
-  serviceType   String   // e.g. "AEPS", "BBPS", "DMT"
+  serviceType   String   @db.VarChar(100)   // e.g. "AEPS", "BBPS", "DMT"
   isPercentage  Boolean  @default(true)
   value         Float    // e.g. 0.5 for 0.5% or 5 for flat ₹5
   isActive      Boolean  @default(true)
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now()) @db.Timestamp(0)
+  updatedAt     DateTime @updatedAt @db.Timestamp(0)
 
   @@unique([role, serviceType])
 }
@@ -234,9 +234,9 @@ model Commission {
   role          Role
   amount        BigInt      // In paise
   isSettled     Boolean     @default(false)
-  settledAt     DateTime?
+  settledAt     DateTime?   @db.Timestamp(0)
 
-  createdAt     DateTime    @default(now())
+  createdAt     DateTime    @default(now()) @db.Timestamp(0)
 
   @@index([transactionId])
   @@index([recipientId])
@@ -246,16 +246,59 @@ model Commission {
 
 model AuditLog {
   id         String   @id @default(cuid())
-  userId     String?
-  action     String   // e.g. "USER_LOGIN", "KYC_APPROVED", "WALLET_CREDITED"
-  entity     String?  // e.g. "User", "Transaction"
-  entityId   String?
-  ipAddress  String?
-  userAgent  String?
+  userId     String?  @db.VarChar(255)
+  action     String   @db.VarChar(255)   // e.g. "USER_LOGIN", "KYC_APPROVED", "WALLET_CREDITED"
+  entity     String?  @db.VarChar(100)   // e.g. "User", "Transaction"
+  entityId   String?  @db.VarChar(255)
+  ipAddress  String?  @db.VarChar(50)
+  userAgent  String?  @db.Text
   metadata   Json?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime @default(now()) @db.Timestamp(0)
 
   @@index([userId])
   @@index([action])
   @@index([createdAt])
+}
+
+// ─── Payments ──────────────────────────────────────────────────────────────
+
+enum PaymentStatus {
+  PENDING
+  CAPTURED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentFor {
+  PLAN_SUBSCRIPTION
+  COURSE_ENROLLMENT
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  razorpayOrderId   String        @unique @db.VarChar(255)
+  razorpayPaymentId String?       @db.VarChar(255)
+  razorpaySignature String?       @db.Text
+  amount            Float
+  currency          String        @default("INR") @db.VarChar(10)
+  status            PaymentStatus @default(PENDING)
+  paymentFor        PaymentFor
+  
+  instituteId       String        @db.VarChar(255)
+  userId            String        @db.VarChar(255)
+  courseId          String?       @db.VarChar(255)
+  planType          PlanType?
+  
+  createdAt         DateTime      @default(now()) @db.Timestamp(0)
+  updatedAt         DateTime      @updatedAt @db.Timestamp(0)
+
+  @@index([userId])
+  @@index([instituteId])
+  @@index([razorpayOrderId])
+}
+
+enum PlanType {
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
 }

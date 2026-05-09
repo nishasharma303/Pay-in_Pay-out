@@ -4,12 +4,16 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Card, CardHeader, CardTitle, Badge, Table, Th, Td, Tr, EmptyState, Skeleton } from '@/components/ui';
 import { formatCurrency, formatDate, ROLE_LABELS, ROLE_COLORS, cn } from '@/lib/utils';
-import { ChevronLeft, ChevronRight, Search, Users, UserCheck, UserX } from 'lucide-react';
+import { useAuthStore } from '@/store/auth.store';
+import { CreateAgentModal } from '@/components/dashboard/create-agent-modal';
+import { ChevronLeft, ChevronRight, Search, UserPlus, Users, UserCheck, UserX } from 'lucide-react';
 
 export default function UsersPage() {
+  const { user } = useAuthStore();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
+  const [showCreateAgent, setShowCreateAgent] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['users', page, search, roleFilter],
@@ -31,7 +35,8 @@ export default function UsersPage() {
   };
 
   return (
-    <div className="space-y-5">
+    <>
+      <div className="space-y-5">
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         {[
@@ -53,6 +58,12 @@ export default function UsersPage() {
         <CardHeader>
           <CardTitle>Users</CardTitle>
           <div className="flex items-center gap-2">
+            {user?.role === 'CLIENT' && (
+              <button onClick={() => setShowCreateAgent(true)} className="btn-primary py-1.5">
+                <UserPlus className="w-4 h-4 mr-2" />
+                Create Agent
+              </button>
+            )}
             {/* Search */}
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
@@ -158,5 +169,8 @@ export default function UsersPage() {
         )}
       </Card>
     </div>
+
+    <CreateAgentModal isOpen={showCreateAgent} onClose={() => setShowCreateAgent(false)} />
+    </>
   );
 }

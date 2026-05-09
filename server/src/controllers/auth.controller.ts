@@ -28,47 +28,14 @@ const getCookieOpts = () => ({
 
 export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const data = registerSchema.parse(req.body);
-    
-    // Check if trying to create AGENT account
-    if (data.role === 'AGENT') {
-      // Check if requester is admin (if authorization header exists)
-      const authReq = req as AuthRequest;
-      const userRole = authReq.user?.role as string;
-      const isAdmin = userRole === 'SUPER_ADMIN' || userRole === 'ADMIN';
-      
-      if (authReq.user && isAdmin) {
-        // Admin can create agent - pass all required fields
-        const user = await authService.registerUser({
-          name: data.name,
-          email: data.email,
-          phone: data.phone,
-          password: data.password,
-          role: Role.AGENT
-        });
-        sendSuccess(res, user, 'Agent account created successfully', 201);
-      } else {
-        // Non-admin trying to create agent - create as CLIENT instead
-        const user = await authService.registerUser({
-          name: data.name,
-          email: data.email,
-          phone: data.phone,
-          password: data.password,
-          role: Role.CLIENT
-        });
-        sendSuccess(res, user, 'Account created successfully', 201);
-      }
-    } else {
-      // Normal CLIENT registration
-      const user = await authService.registerUser({
-        name: data.name,
-        email: data.email,
-        phone: data.phone,
-        password: data.password,
-        role: Role.CLIENT
-      });
-      sendSuccess(res, user, 'Account created successfully', 201);
-    }
+    // Public signup is disabled - only admins can create users via role-based endpoints
+    return res.status(403).json({
+      success: false,
+      error: {
+        message: 'Public registration is disabled. Contact your administrator for account creation.',
+        code: 'SIGNUP_DISABLED',
+      },
+    });
   } catch (err) { 
     next(err); 
   }

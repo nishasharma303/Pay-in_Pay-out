@@ -1,4 +1,4 @@
-import { Role } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 import { prisma } from '../config/database';
 import { AppError } from '../middlewares/error';
 import { creditWallet } from './wallet.service';
@@ -68,7 +68,7 @@ export const distributeCommissions = async (
 
       // Credit wallet
       const wallet = await tx.$queryRaw<Array<{ id: string; primaryBalance: bigint }>>`
-        SELECT id, "primaryBalance" FROM "Wallet" WHERE "userId" = ${dist.userId} FOR UPDATE`;
+  SELECT id, \`primaryBalance\` FROM \`Wallet\` WHERE \`userId\` = ${dist.userId} FOR UPDATE`;
 
       if (wallet[0]) {
         const newBalance = wallet[0].primaryBalance + amountPaise;
@@ -168,37 +168,45 @@ export const getMyCommissions = async (userId: string, page = 1, limit = 20) => 
 
 // ─── Admin: commission report ─────────────────────────────────────────────────
 export const getCommissionReport = async (from?: string, to?: string) => {
-  const dateFilter = (from || to) ? {
+  const dateFilter: Prisma.CommissionWhereInput = (from || to) ? {
     createdAt: {
       ...(from && { gte: new Date(from) }),
       ...(to && { lte: new Date(to + 'T23:59:59') }),
     },
   } : {};
 
-  const [byRole, byService] = await prisma.$transaction([
-    prisma.commission.groupBy({
-      by: ['role'],
+  const [commissionRows, totalSummary, totalTransactions] = await prisma.$transaction([
+    prisma.commission.findMany({
+      where: dateFilter,
+      select: { role: true, amount: true },
+    }),
+    prisma.commission.aggregate({
       where: dateFilter,
       _sum: { amount: true },
-      _count: true,
     }),
-    prisma.commission.groupBy({
-      by: ['transactionId'],
-      where: dateFilter,
-      _sum: { amount: true },
-      _count: true,
-    }),
+    prisma.commission.count({ where: dateFilter }),
   ]);
 
-  const totalPaid = byRole.reduce((sum, r) => sum + Number(r._sum.amount ?? 0n), 0) / 100;
+  const byRoleMap = commissionRows.reduce((acc, row) => {
+    const existing = acc.get(row.role);
+    if (existing) {
+      existing.count += 1;
+      existing.total += row.amount;
+    } else {
+      acc.set(row.role, { role: row.role, count: 1, total: row.amount });
+    }
+    return acc;
+  }, new Map<Role, { role: Role; count: number; total: bigint }>());
+
+  const totalPaid = Number(totalSummary._sum.amount ?? 0n) / 100;
 
   return {
     totalPaid,
-    byRole: byRole.map((r) => ({
-      role: r.role,
-      count: r._count,
-      total: Number(r._sum.amount ?? 0n) / 100,
+    byRole: Array.from(byRoleMap.values()).map((entry) => ({
+      role: entry.role,
+      count: entry.count,
+      total: Number(entry.total) / 100,
     })),
-    totalTransactions: byService.length,
+    totalTransactions,
   };
 };

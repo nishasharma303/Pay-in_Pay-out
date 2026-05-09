@@ -16,6 +16,7 @@ import { payoutRouter }     from './routes/payout.routes';
 import { commissionRouter } from './routes/commission.routes';
 import { adminRouter }      from './routes/admin.routes';
 import { servicesRouter }   from './routes/services.routes';
+import { hierarchyRouter }  from './routes/hierarchy.routes';
 
 const app = express();
 
@@ -81,6 +82,7 @@ app.use('/api/pay-out',     payoutRouter);
 app.use('/api/commissions', commissionRouter);
 app.use('/api/admin',       adminRouter);
 app.use('/api/services',    servicesRouter);
+app.use('/api/hierarchy',   hierarchyRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

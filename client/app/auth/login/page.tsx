@@ -11,9 +11,11 @@ export default function LoginPage() {
   const [showPw, setShowPw] = useState(false);
   const login = useLogin();
   
-  // Check if redirected from registration
+  // Check if redirected from registration or signup disabled
   const isRegistered = typeof window !== 'undefined' && 
     window.location.search.includes('registered=true');
+  const signupDisabled = typeof window !== 'undefined' && 
+    window.location.search.includes('signup_disabled=true');
 
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); login.mutate({ email, password }); };
 
@@ -69,6 +71,12 @@ export default function LoginPage() {
             </div>
           )}
 
+          {signupDisabled && (
+            <div className="mb-5 px-4 py-3 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-sm">
+              ℹ️ Account creation is handled by administrators only.
+            </div>
+          )}
+
           {login.error && (
             <div className="mb-5 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
               {(login.error as any)?.response?.data?.error?.message || 'Invalid credentials'}
@@ -104,7 +112,7 @@ export default function LoginPage() {
 
           <p className="mt-6 text-center text-sm text-gray-500">
             Don&apos;t have an account?{' '}
-            <Link href="/auth/signup" className="text-brand-600 hover:text-brand-700 font-medium">Create one</Link>
+            <span className="text-gray-400 font-medium">Ask your administrator</span>
           </p>
 
           <div className="mt-8 p-3 rounded-lg bg-gray-50 border border-gray-200">

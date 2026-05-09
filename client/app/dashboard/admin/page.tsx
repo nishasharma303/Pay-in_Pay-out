@@ -4,7 +4,8 @@ import { useAuthStore } from '@/store/auth.store';
 import { useAdminStats, useAuditLogs, useTxReport, useSystemHealth } from '@/hooks/use-admin';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Table, Th, Td, Tr, StatCard, EmptyState, Skeleton } from '@/components/ui';
 import { formatCurrency, formatDate, cn, ROLE_LABELS, ROLE_COLORS } from '@/lib/utils';
-import { Activity, AlertTriangle, BookOpen, CheckCircle2, ChevronLeft, ChevronRight, Database, RefreshCw, TrendingUp, Users, Zap } from 'lucide-react';
+import { CreateClientModal } from '@/components/dashboard/create-client-modal';
+import { Activity, AlertTriangle, BookOpen, CheckCircle2, ChevronLeft, ChevronRight, Database, RefreshCw, TrendingUp, UserPlus, Users, Zap } from 'lucide-react';
 
 const TX_TYPE_COLOR: Record<string, string> = {
   PAY_IN: 'text-success', PAY_OUT: 'text-danger', COMMISSION: 'text-brand-400',
@@ -19,6 +20,7 @@ export default function AdminPage() {
   const [auditPage, setAuditPage] = useState(1);
   const { data: auditData, isLoading: auditLoading } = useAuditLogs(auditPage);
   const [activeTab, setActiveTab] = useState<'overview' | 'transactions' | 'audit'>('overview');
+  const [showCreateClient, setShowCreateClient] = useState(false);
 
   const auditLogs = auditData?.data ?? [];
   const auditMeta = auditData?.meta ?? { total: 0, totalPages: 1 };
@@ -30,7 +32,8 @@ export default function AdminPage() {
   ];
 
   return (
-    <div className="space-y-5">
+    <>
+      <div className="space-y-5">
       {/* Tab bar */}
       <div className="flex items-center justify-between">
         <div className="flex gap-1 p-1 bg-surface-800 border border-white/[0.06] rounded-xl">
@@ -43,6 +46,10 @@ export default function AdminPage() {
           ))}
         </div>
         <div className="flex items-center gap-3">
+          <button onClick={() => setShowCreateClient(true)} className="btn-primary py-1.5">
+            <UserPlus className="w-4 h-4 mr-2" />
+            Create Client
+          </button>
           {health && (
             <div className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium',
               health.status === 'healthy' ? 'bg-success/10 border-success/20 text-success' : 'bg-warning/10 border-warning/20 text-warning')}>
@@ -244,5 +251,8 @@ export default function AdminPage() {
         </Card>
       )}
     </div>
+
+    <CreateClientModal isOpen={showCreateClient} onClose={() => setShowCreateClient(false)} />
+    </>
   );
 }
