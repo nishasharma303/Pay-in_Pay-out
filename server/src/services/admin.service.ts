@@ -73,18 +73,18 @@ export const getDashboardStats = async (adminId: string, role: Role) => {
     }) as any),
 
     // Daily volume — last 30 days
-    prisma.$queryRaw<Array<{ date: string; credit: bigint; debit: bigint; count: bigint }>>`
-      SELECT
-        DATE("createdAt")::text AS date,
-        SUM(CASE WHEN type = 'PAY_IN' THEN amount ELSE 0 END) AS credit,
-        SUM(CASE WHEN type = 'PAY_OUT' THEN amount ELSE 0 END) AS debit,
-        COUNT(*) AS count
-      FROM "Transaction"
-      WHERE "createdAt" >= NOW() - INTERVAL '30 days'
-        AND status = 'SUCCESS'
-      GROUP BY DATE("createdAt")
-      ORDER BY date ASC
-    `,
+prisma.$queryRaw<Array<{ date: string; credit: bigint; debit: bigint; count: bigint }>>`
+  SELECT
+    DATE(createdAt) AS date,
+    SUM(CASE WHEN type = 'PAY_IN' THEN amount ELSE 0 END) AS credit,
+    SUM(CASE WHEN type = 'PAY_OUT' THEN amount ELSE 0 END) AS debit,
+    COUNT(*) AS count
+  FROM \`Transaction\`
+  WHERE createdAt >= NOW() - INTERVAL 30 DAY
+    AND status = 'SUCCESS'
+  GROUP BY DATE(createdAt)
+  ORDER BY date ASC
+`,
   ]);
 
   const thisMonthVol = Number(monthVolume._sum.amount ?? 0n) / 100;
